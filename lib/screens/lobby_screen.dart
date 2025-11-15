@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../models/tipo_connessione.dart';
+import '../models/player.dart';
+import '../models/lobby_config.dart';
+import '../models/lobby.dart';
 
 class LobbyScreen extends StatefulWidget {
   final String nickname;
@@ -21,21 +25,34 @@ class LobbyScreen extends StatefulWidget {
 
 class _LobbyScreenState extends State<LobbyScreen>
     with SingleTickerProviderStateMixin {
-  late final List<String> _giocatori;
-
-  // impostazioni stanza (default)
-  bool _azioneIA = false;
-  bool _azioneSuGiocatoreSpecifico = false;
-  bool _azioneDaAltroGiocatore = false;
-  int _azioniPerGiocatore = 4; // 1–24
-  int _bustedMaxPerGiocatore = 2; // 1–24
+  late final Player _me;
+  late Lobby _lobby;
 
   late final AnimationController _dotController;
 
   @override
   void initState() {
     super.initState();
-    _giocatori = [widget.nickname];
+
+    // id "semplice" basato sul tempo: per ora va benissimo
+    final myId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    _me = Player(
+      id: myId,
+      nickname: widget.nickname,
+      isHost: widget.isHost,
+      isConnected: true,
+    );
+
+    _lobby = Lobby(
+      id: widget.codiceStanza ?? myId,
+      codiceStanza: widget.codiceStanza,
+      tipoConnessione: widget.tipoConnessione,
+      hostId: widget.isHost ? _me.id : 'host',
+      stato: LobbyState.inAttesa,
+      config: const LobbyConfig(), // valori di default
+      giocatori: [_me],
+    );
 
     _dotController = AnimationController(
       vsync: this,
@@ -49,13 +66,15 @@ class _LobbyScreenState extends State<LobbyScreen>
     super.dispose();
   }
 
+  void _aggiornaConfig(LobbyConfig nuovaConfig) {
+    setState(() {
+      _lobby = _lobby.copyWith(config: nuovaConfig);
+    });
+  }
+
   void _apriImpostazioni() async {
-    // Copie locali per il bottom sheet
-    bool azIA = _azioneIA;
-    bool azSpec = _azioneSuGiocatoreSpecifico;
-    bool azAltro = _azioneDaAltroGiocatore;
-    int azioni = _azioniPerGiocatore;
-    int busted = _bustedMaxPerGiocatore;
+    // copia locale della configurazione attuale
+    LobbyConfig tempConfig = _lobby.config;
 
     await showModalBottomSheet(
       context: context,
@@ -80,51 +99,70 @@ class _LobbyScreenState extends State<LobbyScreen>
                   const SizedBox(height: 16),
                   SwitchListTile(
                     title: const Text('Azione generata dall’IA'),
-                    value: azIA,
-                    onChanged: (v) => setModalState(() => azIA = v),
+                    value: tempConfig.azioneIA,
+                    onChanged: (v) => setModalState(
+                      () => tempConfig = tempConfig.copyWith(azioneIA: v),
+                    ),
                   ),
                   SwitchListTile(
                     title: const Text(
                       'Azione obbligata su specifico giocatore',
                     ),
-                    value: azSpec,
-                    onChanged: (v) => setModalState(() => azSpec = v),
+                    value: tempConfig.azioneSuGiocatoreSpecifico,
+                    onChanged: (v) => setModalState(
+                      () => tempConfig = tempConfig.copyWith(
+                        azioneSuGiocatoreSpecifico: v,
+                      ),
+                    ),
                   ),
                   SwitchListTile(
                     title: const Text('Azione inviata da un altro giocatore'),
-                    value: azAltro,
-                    onChanged: (v) => setModalState(() => azAltro = v),
+                    value: tempConfig.azioneDaAltroGiocatore,
+                    onChanged: (v) => setModalState(
+                      () => tempConfig = tempConfig.copyWith(
+                        azioneDaAltroGiocatore: v,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  ListTile(title: Text('Azioni per giocatore: $azioni')),
-                  Slider(
-                    value: azioni.toDouble(),
-                    min: 1,
-                    max: 24,
-                    divisions: 23,
-                    label: azioni.toString(),
-                    onChanged: (v) => setModalState(() => azioni = v.round()),
+                  ListTile(
+                    title: Text(
+                      'Azioni per giocatore: ${tempConfig.azioniPerGiocatore}',
+                    ),
                   ),
-                  ListTile(title: Text('BUSTED max per giocatore: $busted')),
                   Slider(
-                    value: busted.toDouble(),
+                    value: tempConfig.azioniPerGiocatore.toDouble(),
                     min: 1,
                     max: 24,
                     divisions: 23,
-                    label: busted.toString(),
-                    onChanged: (v) => setModalState(() => busted = v.round()),
+                    label: tempConfig.azioniPerGiocatore.toString(),
+                    onChanged: (v) => setModalState(
+                      () => tempConfig = tempConfig.copyWith(
+                        azioniPerGiocatore: v.round(),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    title: Text(
+                      'BUSTED max per giocatore: ${tempConfig.bustedMaxPerGiocatore}',
+                    ),
+                  ),
+                  Slider(
+                    value: tempConfig.bustedMaxPerGiocatore.toDouble(),
+                    min: 1,
+                    max: 24,
+                    divisions: 23,
+                    label: tempConfig.bustedMaxPerGiocatore.toString(),
+                    onChanged: (v) => setModalState(
+                      () => tempConfig = tempConfig.copyWith(
+                        bustedMaxPerGiocatore: v.round(),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: () {
-                      // Salvo nei campi "veri" della Lobby
-                      setState(() {
-                        _azioneIA = azIA;
-                        _azioneSuGiocatoreSpecifico = azSpec;
-                        _azioneDaAltroGiocatore = azAltro;
-                        _azioniPerGiocatore = azioni;
-                        _bustedMaxPerGiocatore = busted;
-                      });
+                      _aggiornaConfig(tempConfig);
                       Navigator.of(ctx).pop();
                     },
                     child: const Text('Salva impostazioni'),
@@ -139,7 +177,7 @@ class _LobbyScreenState extends State<LobbyScreen>
   }
 
   void _avviaPartita() {
-    // In futuro: naviga alla schermata di gioco
+    // qui più avanti: cambia stato della lobby + naviga alla schermata di gioco
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Partita avviata (placeholder)')),
     );
@@ -148,7 +186,7 @@ class _LobbyScreenState extends State<LobbyScreen>
   @override
   Widget build(BuildContext context) {
     final hasCodice =
-        widget.codiceStanza != null && widget.codiceStanza!.isNotEmpty;
+        _lobby.codiceStanza != null && _lobby.codiceStanza!.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Stanza Busted')),
@@ -162,9 +200,9 @@ class _LobbyScreenState extends State<LobbyScreen>
             const SizedBox(height: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: _giocatori
+              children: _lobby.giocatori
                   .map(
-                    (nome) => Row(
+                    (player) => Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         AnimatedBuilder(
@@ -184,7 +222,7 @@ class _LobbyScreenState extends State<LobbyScreen>
                             ),
                           ),
                         ),
-                        Text(nome),
+                        Text(player.nickname),
                       ],
                     ),
                   )
@@ -193,7 +231,7 @@ class _LobbyScreenState extends State<LobbyScreen>
             const SizedBox(height: 24),
 
             // Centro: pulsanti
-            if (widget.isHost) ...[
+            if (_me.isHost) ...[
               Row(
                 children: [
                   FilledButton(
@@ -224,7 +262,7 @@ class _LobbyScreenState extends State<LobbyScreen>
             // Codice stanza (solo se esiste)
             if (hasCodice)
               Text(
-                'Codice stanza: ${widget.codiceStanza}',
+                'Codice stanza: ${_lobby.codiceStanza}',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
           ],
