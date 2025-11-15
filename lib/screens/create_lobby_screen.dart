@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-
-enum GameMode { normal, competitive }
-
-enum NetworkMode { online, lan, bluetooth }
-
-enum EndCondition { timer, actionsDone, manual }
+import '../models/tipo_connessione.dart';
+import 'lobby_screen.dart';
 
 class CreateLobbyScreen extends StatefulWidget {
   const CreateLobbyScreen({super.key});
@@ -14,137 +10,100 @@ class CreateLobbyScreen extends StatefulWidget {
 }
 
 class _CreateLobbyScreenState extends State<CreateLobbyScreen> {
-  GameMode _mode = GameMode.normal;
-  NetworkMode _network = NetworkMode.online;
-  EndCondition _end = EndCondition.timer;
+  final _nomeController = TextEditingController();
+  TipoConnessione _tipo = TipoConnessione.wifi;
 
-  bool _aiAction = false;
-  bool _forcedTarget = false;
-  bool _playerSent = false;
+  @override
+  void dispose() {
+    _nomeController.dispose();
+    super.dispose();
+  }
 
-  int _actionsPerPlayer = 3;
-  int _bustedMax = 3;
-  int _timerMinutes = 10;
+  String _generaCodiceStanza() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final seed = DateTime.now().millisecondsSinceEpoch;
+    String code = '';
+    for (int i = 0; i < 5; i++) {
+      code += chars[(seed + i * 17) % chars.length];
+    }
+    return code;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bool usaCodice = _tipo == TipoConnessione.serverOnline;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Lobby')),
-      body: ListView(
+      appBar: AppBar(title: const Text('Crea stanza')),
+      body: Padding(
         padding: const EdgeInsets.all(16),
-        children: [
-          // Modalità
-          SegmentedButton<GameMode>(
-            segments: const [
-              ButtonSegment(value: GameMode.normal, label: Text('Normal')),
-              ButtonSegment(
-                value: GameMode.competitive,
-                label: Text('Competitive'),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
-          ),
-          const SizedBox(height: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nomeController,
+              decoration: const InputDecoration(labelText: 'Nickname'),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Scegli il tipo di connessione per la stanza:',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            RadioListTile<TipoConnessione>(
+              title: const Text('Wi-Fi'),
+              value: TipoConnessione.wifi,
+              groupValue: _tipo,
+              onChanged: (v) => setState(() => _tipo = v!),
+            ),
+            RadioListTile<TipoConnessione>(
+              title: const Text('Bluetooth'),
+              value: TipoConnessione.bluetooth,
+              groupValue: _tipo,
+              onChanged: (v) => setState(() => _tipo = v!),
+            ),
+            RadioListTile<TipoConnessione>(
+              title: const Text('Server online (connessione dati)'),
+              subtitle: const Text('Usa un codice stanza di 5 lettere'),
+              value: TipoConnessione.serverOnline,
+              groupValue: _tipo,
+              onChanged: (v) => setState(() => _tipo = v!),
+            ),
+            const Spacer(),
+            FilledButton(
+              onPressed: () {
+                final nome = _nomeController.text.trim();
+                if (nome.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Inserisci un nickname')),
+                  );
+                  return;
+                }
 
-          // Connessione
-          DropdownButtonFormField<NetworkMode>(
-            value: _network,
-            decoration: const InputDecoration(labelText: 'Connessione'),
-            items: const [
-              DropdownMenuItem(
-                value: NetworkMode.online,
-                child: Text('Online'),
-              ),
-              DropdownMenuItem(
-                value: NetworkMode.lan,
-                child: Text('Wi-Fi locale'),
-              ),
-              DropdownMenuItem(
-                value: NetworkMode.bluetooth,
-                child: Text('Bluetooth'),
-              ),
-            ],
-            onChanged: (v) =>
-                setState(() => _network = v ?? NetworkMode.online),
-          ),
-          const Divider(height: 32),
+                String? codice;
+                if (usaCodice) {
+                  codice = _generaCodiceStanza();
+                }
 
-          // Switch
-          SwitchListTile(
-            title: const Text('Azione generata dall’IA'),
-            value: _aiAction,
-            onChanged: (v) => setState(() => _aiAction = v),
-          ),
-          SwitchListTile(
-            title: const Text('Azione obbligata su giocatore specifico'),
-            value: _forcedTarget,
-            onChanged: (v) => setState(() => _forcedTarget = v),
-          ),
-          SwitchListTile(
-            title: const Text('Azione inviata da un altro giocatore'),
-            value: _playerSent,
-            onChanged: (v) => setState(() => _playerSent = v),
-          ),
-
-          // Slider numerici
-          ListTile(title: Text('Azioni per giocatore: $_actionsPerPlayer')),
-          Slider(
-            value: _actionsPerPlayer.toDouble(),
-            min: 1,
-            max: 10,
-            divisions: 9,
-            label: _actionsPerPlayer.toString(),
-            onChanged: (v) => setState(() => _actionsPerPlayer = v.round()),
-          ),
-          ListTile(title: Text('BUSTED max per giocatore: $_bustedMax')),
-          Slider(
-            value: _bustedMax.toDouble(),
-            min: 1,
-            max: 10,
-            divisions: 9,
-            label: _bustedMax.toString(),
-            onChanged: (v) => setState(() => _bustedMax = v.round()),
-          ),
-          ListTile(title: Text('Timer (minuti): $_timerMinutes')),
-          Slider(
-            value: _timerMinutes.toDouble(),
-            min: 1,
-            max: 60,
-            divisions: 59,
-            label: _timerMinutes.toString(),
-            onChanged: (v) => setState(() => _timerMinutes = v.round()),
-          ),
-
-          // Fine partita
-          DropdownButtonFormField<EndCondition>(
-            value: _end,
-            decoration: const InputDecoration(labelText: 'Fine partita'),
-            items: const [
-              DropdownMenuItem(value: EndCondition.timer, child: Text('Timer')),
-              DropdownMenuItem(
-                value: EndCondition.actionsDone,
-                child: Text('Azioni finite'),
+                // Vai alla schermata Stanza come creatore
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => LobbyScreen(
+                      nickname: nome,
+                      isHost: true,
+                      tipoConnessione: _tipo,
+                      codiceStanza: codice,
+                    ),
+                  ),
+                );
+              },
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
               ),
-              DropdownMenuItem(
-                value: EndCondition.manual,
-                child: Text('Manuale'),
-              ),
-            ],
-            onChanged: (v) => setState(() => _end = v ?? EndCondition.timer),
-          ),
-
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () {
-              // TODO: crea lobby sul backend e naviga
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Lobby creata (placeholder)')),
-              );
-            },
-            child: const Text('Create'),
-          ),
-        ],
+              child: const Text('Crea stanza'),
+            ),
+          ],
+        ),
       ),
     );
   }

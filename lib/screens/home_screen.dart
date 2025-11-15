@@ -18,7 +18,7 @@ class HomeScreen extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),
-                child: const Text('Create Lobby'),
+                child: const Text('Crea stanza'),
               ),
               const SizedBox(height: 12),
               OutlinedButton(
@@ -26,12 +26,7 @@ class HomeScreen extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),
-                child: const Text('Join Lobby'),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.pushNamed(context, '/settings'),
-                child: const Text('Settings'),
+                child: const Text('Entra in stanza'),
               ),
             ],
           ),

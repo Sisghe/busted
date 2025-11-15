@@ -17,7 +17,6 @@ class BustedApp extends StatelessWidget {
       routes: {
         '/create': (_) => const CreateLobbyScreen(),
         '/join': (_) => const JoinLobbyScreen(),
-        '/settings': (_) => const Placeholder(),
       },
     );
   }
